@@ -31,7 +31,7 @@ SECTIONS {
 		*(.rodata)
 		*(.bss)
 	} = 0x3F3F3F3F
-	
+	end = .;
 	/*
 	* Finally comes everything else. A fun trick here is to put all other 
 	* sections into this section, which will be discarded by default.

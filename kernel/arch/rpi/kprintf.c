@@ -6,20 +6,9 @@
  * for the kernel of all things.
  */
 
-#include <types.h>
-#include <va_list.h>
+#include <system.h>
 
 extern void print(char *);
-extern int  strlen(char *);
-
-unsigned char * memset(unsigned char * dest, unsigned char val, int count) {
-	int i = 0;
-	for ( ; i < count; ++i ) {
-		dest[i] = val;
-	}
-	return dest;
-}
-
 
 /*
  * Integer to string

@@ -1,4 +1,5 @@
-CFLAGS = -Wall -Wextra -pedantic -O0 -std=c99 -finline-functions -fno-stack-protector -nostdinc -ffreestanding -Wno-unused-function -Wno-unused-parameter -g
+CFLAGS = -Wall -Wextra -pedantic -march=armv6zk -O0 -std=c99 -finline-functions -fno-stack-protector -nostdinc -ffreestanding -Wno-unused-function -Wno-unused-parameter -g
+CFLAGS := ${CFLAGS} -fshort-wchar
 CC = arm-none-eabi-gcc
 AS = arm-none-eabi-as
 LD = arm-none-eabi-ld
