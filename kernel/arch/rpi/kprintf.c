@@ -88,7 +88,7 @@ vasprintf(char * buf, const char *fmt, va_list args) {
 	int i = 0;
 	char *s;
 	int ptr = 0;
-	int len = strlen(fmt);
+	int len = strlen((char *)fmt);
 	for ( ; i < len && fmt[i]; ++i) {
 		if (fmt[i] != '%') {
 			buf[ptr++] = fmt[i];

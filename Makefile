@@ -1,70 +1,125 @@
-###############################################################################
-#	makefile
-#	 by Alex Chadwick
-#
-#	A makefile script for generation of raspberry pi kernel images.
-###############################################################################
-
-# The toolchain to use. arm-none-eabi works, but there does exist 
-# arm-bcm2708-linux-gnueabi.
-ARMGNU ?= arm-none-eabi
-
-# The intermediate directory for compiled object files.
-BUILD = build/
-
-# The directory in which source files are stored.
-SOURCE = source/
-
-# The name of the output file to generate.
-TARGET = kernel.img
-
-# The name of the assembler listing file to generate.
-LIST = kernel.list
-
-# The name of the map file to generate.
-MAP = kernel.map
-
-# The name of the linker script to use.
-LINKER = kernel.ld
-
-# The names of libraries to use.
-LIBRARIES := csud
-
 CFLAGS = -Wall -Wextra -pedantic -O0 -std=c99 -finline-functions -fno-stack-protector -nostdinc -ffreestanding -Wno-unused-function -Wno-unused-parameter -g
+CC = arm-none-eabi-gcc
+AS = arm-none-eabi-as
+LD = arm-none-eabi-ld
+ARCH = rpi
 
-# The names of all object files that must be generated. Deduced from the 
-# assembly code files in source.
-OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s)) $(patsubst $(SOURCE)%.c,$(BUILD)%.o,$(wildcard $(SOURCE)*.c))
+FILESYSTEMS  = $(patsubst %.c,%.o,$(wildcard kernel/fs/*.c))
+VIDEODRIVERS = $(patsubst %.c,%.o,$(wildcard kernel/video/*.c))
+DEVICES      = $(patsubst %.c,%.o,$(wildcard kernel/devices/*.c))
+VIRTUALMEM   = $(patsubst %.c,%.o,$(wildcard kernel/mem/*.c))
+MISCMODS     = $(patsubst %.c,%.o,$(wildcard kernel/misc/*.c))
+SYSTEM       = $(patsubst %.c,%.o,$(wildcard kernel/sys/*.c))
+DATASTRUCTS  = $(patsubst %.c,%.o,$(wildcard kernel/ds/*.c))
+CPUBITS      = $(patsubst %.c,%.o,$(wildcard kernel/cpu/*.c))
+RPIBITS_AS   = $(patsubst %.s,%.o,$(wildcard kernel/arch/rpi/*.s))
+RPIBITS_C    = $(patsubst %.c,%.o,$(wildcard kernel/arch/rpi/*.c))
 
-# Rule to make everything.
-all: $(TARGET) $(LIST)
+SUBMODULES = ${FILESYSTEMS} ${VIDEODRIVERS} ${DEVICES} ${VIRTUALMEM} ${MISCMODS} ${SYSTEM} ${DATASTRUCTS} ${CPUBITS} ${RPIBITS_AS} ${RPIBITS_C}
+EXTRA =  kernel/arch/rpi/libcsud.a
 
-# Rule to remake everything. Does not include clean.
-rebuild: all
+UTILITIES = util/bin/readelf util/bin/typewriter util/bin/bim
+EMU = qemu-system-arm
+GENEXT = genext2fs
+DD = dd conv=notrunc
+BEG = util/mk-beg
+END = util/mk-end
+INFO = util/mk-info
+ERRORS = 2>>/tmp/.`whoami`-build-errors || util/mk-error
+ERRORSS = >>/tmp/.`whoami`-build-errors || util/mk-error
 
-# Rule to make the listing file.
-$(LIST) : $(BUILD)output.elf
-	$(ARMGNU)-objdump -d $(BUILD)output.elf > $(LIST)
+BEGRM = util/mk-beg-rm
+ENDRM = util/mk-end-rm
 
-# Rule to make the image file.
-$(TARGET) : $(BUILD)output.elf
-	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(TARGET) 
+EMUARGS     = -kernel toaruos-kernel -m 1024 -serial stdio -vga std -hda toaruos-disk.img -k en-us -no-frame -rtc base=localtime
+EMUKVM      = -enable-kvm
 
-# Rule to make the elf file.
-$(BUILD)output.elf : $(OBJECTS) $(LINKER)
-	$(ARMGNU)-ld --no-undefined $(OBJECTS) -L. $(patsubst %,-l %,$(LIBRARIES)) -Map $(MAP) -o $(BUILD)output.elf -T $(LINKER)
+.PHONY: all system clean clean-once clean-hard clean-soft clean-docs clean-bin clean-aux clean-core install run docs utils
+.SECONDARY: 
 
-# Rule to make the object files.
-$(BUILD)%.o: $(SOURCE)%.s
-	$(ARMGNU)-as -I $(SOURCE) $< -o $@
+all: system
+system: kernel.img
 
-$(BUILD)%.o: $(SOURCE)%.c
-	$(ARMGNU)-gcc $(CFLAGS) -I $(SOURCE) -c -o $@ $<
+kernel.img: toaruos-kernel
+	@arm-none-eabi-objcopy $< -O binary $@
 
-# Rule to clean files.
-clean : 
-	-rm -f $(BUILD)*.o 
-	-rm -f $(BUILD)output.elf
-	-rm -f $(TARGET)
-	-rm -f $(LIST)
-	-rm -f $(MAP)
+toaruos-kernel: ${SUBMODULES}
+	@${BEG} "LD" "$@"
+	@${LD} --no-undefined ${SUBMODULES} ${EXTRA} -T kernel/arch/${ARCH}/link.ld -o toaruos-kernel
+	@${END} "LD" "$@"
+	@${INFO} "--" "Kernel is ready!"
+
+%.o: %.s
+	@${BEG} "AS" "$<"
+	@${AS} -I./kernel/include $< -o $@ ${ERRORS}
+	@${END} "AS" "$<"
+
+kernel/sys/version.o: kernel/*/*.c kernel/*.c
+
+%.o: %.c
+	@${BEG} "CC" "$<"
+	@${CC} ${CFLAGS} -I./kernel/include -c -o $@ $< ${ERRORS}
+	@${END} "CC" "$<"
+
+
+##############
+#    ctags   #
+##############
+tags: kernel/*/*.c kernel/*.c .userspace-check
+	@${BEG} "ctag" "Generating CTags..."
+	@ctags -R --c++-kinds=+p --fields=+iaS --extra=+q kernel userspace util
+	@${END} "ctag" "Generated CTags."
+
+###############
+#    clean    #
+###############
+
+clean-soft:
+	@${BEGRM} "RM" "Cleaning modules..."
+	@-rm -f kernel/*.o
+	@-rm -f ${SUBMODULES}
+	@${ENDRM} "RM" "Cleaned modules."
+
+clean-docs:
+	@${BEGRM} "RM" "Cleaning documentation..."
+	@-rm -f docs/*.pdf docs/*.aux docs/*.log docs/*.out
+	@-rm -f docs/*.idx docs/*.ind docs/*.toc docs/*.ilg
+	@${ENDRM} "RM" "Cleaned documentation"
+
+clean-bin:
+	@${BEGRM} "RM" "Cleaning native binaries..."
+	@-rm -f hdd/bin/*
+	@${ENDRM} "RM" "Cleaned native binaries"
+
+clean-aux:
+	@${BEGRM} "RM" "Cleaning auxillary files..."
+	@-rm -f loader/*.o
+	@-rm -f util/bin/*
+	@${ENDRM} "RM" "Cleaned auxillary files"
+
+clean-core:
+	@${BEGRM} "RM" "Cleaning final output..."
+	@-rm -f toaruos-kernel
+	@-rm -f toaruos-initrd
+	@-rm -f kernel.img
+	@${ENDRM} "RM" "Cleaned final output"
+
+clean: clean-soft clean-core
+	@${INFO} "--" "Finished soft cleaning"
+
+clean-hard: clean clean-bin clean-aux clean-docs
+	@${INFO} "--" "Finished hard cleaning"
+
+clean-disk:
+	@${BEGRM} "RM" "Deleting hard disk image..."
+	@-rm -f toaruos-disk.img
+	@${ENDRM} "RM" "Deleted hard disk image"
+
+clean-once:
+	@${BEGRM} "RM" "Cleaning one-time files..."
+	@-rm -f .passed
+	@${ENDRM} "RM" "Cleaned one-time files"
+
+# vim:noexpandtab
+# vim:tabstop=4
+# vim:shiftwidth=4
