@@ -67,6 +67,7 @@ void free(void *ptr);
 /* kprintf */
 extern size_t vasprintf(char * buf, const char *fmt, va_list args);
 extern int    kprintf(const char *fmt, ...);
+extern int    sprintf(char *buf, const char *fmt, ...);
 
 struct regs {
     unsigned int _regs[18];

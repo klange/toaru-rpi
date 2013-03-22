@@ -55,7 +55,7 @@ toaruos-kernel: ${SUBMODULES}
 	@${AS} -I./kernel/include $< -o $@ ${ERRORS}
 	@${END} "AS" "$<"
 
-kernel/sys/version.o: kernel/*/*.c kernel/*.c
+kernel/sys/version.o: kernel/*/*.c kernel/arch/*/*.c
 
 %.o: %.c
 	@${BEG} "CC" "$<"
