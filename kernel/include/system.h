@@ -19,10 +19,11 @@
 
 extern unsigned int __irq_sem;
 
-#define IRQ_OFF {  }
-#define IRQ_RES {  }
+#define IRQ_OFF { asm volatile ("mrs r0, cpsr\nbic r0, r0, #(1<<7)\nmsr cpsr_c, r0\nmov pc,lr\n"); }
+#define IRQ_RES { asm volatile ("mrs r0, cpsr\norr r0, r0, #(1<<7)\nmsr cpsr_c, r0\nmov pc,lr\n"); }
 #define PAUSE   { asm volatile ("wfi"); }
-#define IRQS_ON_AND_PAUSE { }
+#define IRQS_ON_AND_PAUSE { IRQ_RES; PAUSE; IRQ_OFF; }
+
 
 #define STOP while (1) { PAUSE; }
 
