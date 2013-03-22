@@ -203,6 +203,7 @@ static uintptr_t __attribute__ ((always_inline, pure)) klmalloc_bin_size(uintptr
 		if (size & (0x1 << (31-i))) break;
 		bin++;
 	}
+	bin = sizeof(size) * CHAR_BIT - bin;
 	bin += !!(size & (size - 1));
 	return klmalloc_adjust_bin(bin);
 }

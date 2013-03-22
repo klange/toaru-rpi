@@ -54,6 +54,8 @@ extern uint32_t strlen(const char *str);
 /* Memory Management */
 extern uintptr_t placement_pointer;
 void * sbrk(uintptr_t increment);
+void heap_install();
+
 
 /* klmalloc */
 void * __attribute__ ((malloc)) malloc(size_t size);
