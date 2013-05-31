@@ -1,11 +1,7 @@
 #include <system.h>
 #include <version.h>
 #include <list.h>
-
-extern void Print(char *, int len);
-extern void UsbInitialise();
-extern int  ReadLine(char * buf, int len);
-extern uint8_t arm_get_lock(uint8_t volatile * lock);
+#include <rpi.h>
 
 void print(char * str) {
 	Print(str, strlen(str));
@@ -27,6 +23,53 @@ uint8_t arm__sync_lock_test_and_set(volatile uint8_t * ptr, uint8_t value) {
 int main() {
 	UsbInitialise();
 	heap_install();
+
+#if 0
+	unsigned int ra;
+
+	PUT32(IRQ_DISABLE_BASIC,1);
+
+	ra=GET32(GPFSEL1);
+	ra&=~(7<<18);
+	ra|=1<<18;
+	PUT32(GPFSEL1,ra);
+	PUT32(GPSET0,1<<16);
+
+	PUT32(ARM_TIMER_CTL,0x003E0000);
+	PUT32(ARM_TIMER_LOD,1000000-1);
+	PUT32(ARM_TIMER_RLD,1000000-1);
+	PUT32(ARM_TIMER_DIV,0x000000F9);
+	PUT32(ARM_TIMER_CLI,0);
+	PUT32(ARM_TIMER_CTL,0x003E00A2);
+
+	for(ra=0;ra<5;ra++)
+	{
+		PUT32(GPCLR0,1<<16);
+		while(1) if(GET32(ARM_TIMER_MIS)) break;
+		PUT32(ARM_TIMER_CLI,0);
+		PUT32(GPSET0,1<<16);
+		while(1) if(GET32(ARM_TIMER_MIS)) break;
+		PUT32(ARM_TIMER_CLI,0);
+	}
+
+	PUT32(ARM_TIMER_LOD,2000000-1);
+	PUT32(ARM_TIMER_RLD,2000000-1);
+	PUT32(ARM_TIMER_CLI,0);
+	PUT32(IRQ_ENABLE_BASIC,1);
+	for(ra=0;ra<5;ra++)
+	{
+		PUT32(GPCLR0,1<<16);
+		while(1) if(GET32(IRQ_BASIC)&1) break;
+		PUT32(ARM_TIMER_CLI,0);
+		PUT32(GPSET0,1<<16);
+		while(1) if(GET32(IRQ_BASIC)&1) break;
+		PUT32(ARM_TIMER_CLI,0);
+	}
+
+	PUT32(ARM_TIMER_LOD,4000000-1);
+	PUT32(ARM_TIMER_RLD,4000000-1);
+	enable_irq();
+#endif
 
 	char version_number[1024];
 	sprintf(version_number, __kernel_version_format,
@@ -70,3 +113,7 @@ int main() {
 	}
 }
 
+void c_irq_handler() {
+	kprintf("Ping\n");
+	PUT32(ARM_TIMER_CLI, 0);
+}
